@@ -23,3 +23,7 @@ CSV yang dipublikasikan dapat dibaca publik. Pastikan data yang ditampilkan mema
 
 ## Ekspor laporan JPEG
 Klik tombol **Ekspor JPEG** di kanan atas dashboard. Gambar akan mengikuti filter Kota, Grup, Status Channel, dan AHASS yang sedang aktif. Untuk laporan yang paling mudah dibaca di WhatsApp, gunakan halaman Ringkasan dan pilih filter yang sesuai sebelum mengekspor. Fitur ini menggunakan html2canvas dari CDN sehingga membutuhkan koneksi internet saat dashboard dibuka.
+
+
+## JPEG landscape untuk semua AHASS
+Ekspor JPEG sekarang menggunakan kanvas landscape resolusi tinggi dan memasukkan seluruh AHASS yang sesuai filter aktif ke dalam tabel (bukan hanya enam baris watchlist di layar). Grafik tetap disembunyikan khusus saat ekspor. Untuk grup Astra dengan 14 dealer, semua dealer dapat berada dalam satu gambar. KPI di bagian atas tetap merupakan agregat seluruh AHASS yang cocok dengan filter aktif.

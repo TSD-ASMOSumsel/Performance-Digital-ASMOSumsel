@@ -163,14 +163,15 @@ async function exportDashboardJpeg(){
     const target=$("page-overview");
     const canvas=await html2canvas(document.querySelector(".main"),{
       backgroundColor:"#f4f7fc",
-      scale:2,
+      scale:1.5,
       useCORS:true,
       logging:false,
-      windowWidth:Math.max(document.documentElement.scrollWidth,1440),
+      windowWidth:2200,
+      width:2200,
       onclone:(doc)=>{
         doc.body.classList.add("exporting");
         const clonedMain=doc.querySelector(".main");
-        if(clonedMain){clonedMain.style.width="1440px";clonedMain.style.marginLeft="0";clonedMain.style.padding="28px 34px";}
+        if(clonedMain){clonedMain.style.width="2200px";clonedMain.style.maxWidth="none";clonedMain.style.marginLeft="0";clonedMain.style.padding="38px 48px";clonedMain.style.boxSizing="border-box";}
         const actions=doc.querySelector(".top-actions");
         if(actions)actions.style.visibility="hidden";
         // Export the current page; omit both charts for a compact dealer report.
@@ -189,6 +190,21 @@ async function exportDashboardJpeg(){
           const panel=canvas.closest(".panel");
           if(panel)panel.style.setProperty("display","none","important");
         });
+        // Render every AHASS matching the active filters in the JPEG, rather than
+        // the compact six-row watchlist used in the live dashboard.
+        const body=doc.querySelector("#watchlistBody");
+        if(body){
+          const reportRows=filtered().sort((a,b)=>String(a.city).localeCompare(String(b.city))||String(a.code).localeCompare(String(b.code)));
+          body.innerHTML=reportRows.map(d=>`<tr><td>${esc(d.code)} · ${esc(d.name)}</td><td>${esc(d.city)}</td><td>${achievementCell("digitalShare",d.digitalShare,d.kpbDigital,d.kpbTotal)}</td><td>${achievementCell("bookingAch",d.bookingAch,d.bookingActual,d.bookingTarget)}</td><td>${achievementCell("payAch",d.payAch,d.payActual,d.payTarget)}</td><td>${badge(d.priority)}</td></tr>`).join("")||emptyRow(6);
+          const reportTable=body.closest("table");
+          if(reportTable){reportTable.style.width="100%";reportTable.style.fontSize="16px";reportTable.querySelectorAll("th,td").forEach(cell=>{cell.style.padding="15px 18px";cell.style.whiteSpace="nowrap";});}
+          const watchlist=body.closest(".panel");
+          if(watchlist){watchlist.style.marginTop="24px";watchlist.style.padding="28px 32px";}
+        }
+        // Larger typography and spacing for high-resolution landscape reports.
+        const exportStyle=doc.createElement("style");
+        exportStyle.textContent=`#page-overview .kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:18px!important}#page-overview .kpi{min-height:150px!important;padding:24px!important}#page-overview .kpi-value{font-size:38px!important}#page-overview .filterbar{padding:20px 24px!important;margin-bottom:26px!important}#page-overview .page-header h1{font-size:38px!important}#page-overview .eyebrow{font-size:14px!important}#page-overview .panel h2{font-size:24px!important}#page-overview .panel p{font-size:15px!important}#page-overview .achievement-detail{font-size:14px!important}#page-overview .metric-status{font-size:16px!important}#page-overview .pill{font-size:13px!important;padding:6px 10px!important}#page-overview footer{font-size:13px!important}`;
+        doc.head.appendChild(exportStyle);
       }
     });
     const link=document.createElement("a");
