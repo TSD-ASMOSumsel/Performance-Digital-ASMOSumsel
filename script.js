@@ -172,8 +172,14 @@ async function exportDashboardJpeg(){
         if(clonedMain){clonedMain.style.width="1440px";clonedMain.style.marginLeft="0";clonedMain.style.padding="28px 34px";}
         const actions=doc.querySelector(".top-actions");
         if(actions)actions.style.visibility="hidden";
-        // Export the current page; overview is the recommended dealer report layout.
+        // Export the current page; omit both charts for a compact dealer report.
         doc.querySelectorAll(".page:not(.active)").forEach(el=>el.style.display="none");
+        doc.querySelectorAll("#page-overview .panel").forEach(panel=>{
+          const heading=(panel.querySelector("h2")?.textContent||"").trim().toLowerCase();
+          if(heading.includes("pencapaian per channel")||heading.includes("komposisi kpb digital")){
+            panel.style.display="none";
+          }
+        });
       }
     });
     const link=document.createElement("a");
