@@ -11,6 +11,7 @@ function statusClass(metric, value){
   return value < threshold[0] ? "red" : value < threshold[1] ? "yellow" : "green";
 }
 function coloredPercent(metric,value){return `<span class="metric-status ${statusClass(metric,value)}">${percent(value)}</span>`}
+function achievementCell(metric,value,actual,target){return `<div class="achievement-cell">${coloredPercent(metric,value)}<span class="achievement-detail">(${fmt(actual)} / ${fmt(target)})</span></div>`}
 function avgRate(actual,target){return target>0?actual/target:0}
 function parseRows(raw){
   const rows=Papa.parse(raw,{skipEmptyLines:false}).data;
@@ -114,7 +115,7 @@ function render(){
  chart("achievementChart",{type:"bar",data:{labels:["KPB Digital","Booking Servis","AstraPay"],datasets:[{data:[digital*100,b*100,p*100],backgroundColor:["#2864dc","#8c6ce5","#2ca878"],borderRadius:6,barThickness:28}]},options:{...baseOptions(),indexAxis:"y",scales:{x:{beginAtZero:true,grid:{color:"#eef1f6"},ticks:{color:"#8c98aa",callback:v=>v+"%"}},y:{grid:{display:false},ticks:{color:"#56657a"}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.toFixed(1)+"%"}}}}});
  chart("mixChart",{type:"doughnut",data:{labels:["Digital KPB","Non-digital KPB"],datasets:[{data:[a.kpbDigital,Math.max(0,a.kpbTotal-a.kpbDigital)],backgroundColor:["#2864dc","#dce3ed"],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:"72%",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+": "+fmt(c.raw)}}}}});
  const top=[...rows].sort((x,y)=>Math.min(x.bookingAch,x.payAch)-Math.min(y.bookingAch,y.payAch)).slice(0,6);
- $("watchlistBody").innerHTML=top.map(d=>`<tr><td>${esc(d.code)} · ${esc(d.name)}</td><td>${esc(d.city)}</td><td>${coloredPercent("digitalShare",d.digitalShare)}</td><td>${coloredPercent("bookingAch",d.bookingAch)}</td><td>${coloredPercent("payAch",d.payAch)}</td><td>${badge(d.priority)}</td></tr>`).join("")||emptyRow(6);
+ $("watchlistBody").innerHTML=top.map(d=>`<tr><td>${esc(d.code)} · ${esc(d.name)}</td><td>${esc(d.city)}</td><td>${achievementCell("digitalShare",d.digitalShare,d.kpbDigital,d.kpbTotal)}</td><td>${achievementCell("bookingAch",d.bookingAch,d.bookingActual,d.bookingTarget)}</td><td>${achievementCell("payAch",d.payAch,d.payActual,d.payTarget)}</td><td>${badge(d.priority)}</td></tr>`).join("")||emptyRow(6);
  renderChannels(rows,a);renderRanking(rows);renderActions(rows);
 }
 function badge(p){const label=({"Critical":"Kritis","High":"Tinggi","Monitor":"Pantau"})[p]||p;return `<span class="pill ${p.toLowerCase()}">${label}</span>`}
@@ -129,7 +130,7 @@ function renderChannels(rows,a){
 function renderRanking(rows){
  const metric=$("rankMetric").value,limit=Number($("rankLimit").value);
  const sorted=[...rows].sort((a,b)=>b[metric]-a[metric]).slice(0,limit);
- $("rankingBody").innerHTML=sorted.map((d,i)=>`<tr><td>${i+1}</td><td>${esc(d.code)} · ${esc(d.name)}</td><td>${esc(d.city)}</td><td>${esc(d.group)}</td><td>${coloredPercent("digitalShare",d.digitalShare)}</td><td>${coloredPercent("bookingAch",d.bookingAch)}</td><td>${coloredPercent("payAch",d.payAch)}</td></tr>`).join("")||emptyRow(7);
+ $("rankingBody").innerHTML=sorted.map((d,i)=>`<tr><td>${i+1}</td><td>${esc(d.code)} · ${esc(d.name)}</td><td>${esc(d.city)}</td><td>${esc(d.group)}</td><td>${achievementCell("digitalShare",d.digitalShare,d.kpbDigital,d.kpbTotal)}</td><td>${achievementCell("bookingAch",d.bookingAch,d.bookingActual,d.bookingTarget)}</td><td>${achievementCell("payAch",d.payAch,d.payActual,d.payTarget)}</td></tr>`).join("")||emptyRow(7);
 }
 function renderActions(rows){
  const counts={Critical:0,High:0,Monitor:0};rows.forEach(d=>counts[d.priority]++);

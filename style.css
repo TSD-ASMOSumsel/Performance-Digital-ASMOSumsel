@@ -54,3 +54,8 @@ body.exporting .panel, body.exporting .kpi { box-shadow: none !important; break-
   .export-btn { padding: 9px 10px; }
   .export-btn span { display: none; }
 }
+
+/* Show achievement percentage and actual/target basis in AHASS tables */
+.achievement-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; white-space: nowrap; }
+.achievement-cell .achievement-detail { color: #7a8798; font-size: 11px; font-weight: 500; line-height: 1.25; }
+@media (max-width: 760px) { .achievement-cell .achievement-detail { font-size: 10px; } }
