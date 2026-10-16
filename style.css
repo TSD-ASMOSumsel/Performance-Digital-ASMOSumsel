@@ -32,3 +32,25 @@ footer{font-weight:500}
 .metric-status.red-text{color:#c33d4b!important}
 .metric-status.yellow-text{color:#b97710!important}
 .metric-status.green-text{color:#18865b!important}
+
+
+/* JPEG export */
+.top-actions { gap: 10px; }
+.export-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border: 1px solid #cbd8eb; border-radius: 10px; padding: 10px 14px;
+  background: #fff; color: #17345f; font: inherit; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+.export-btn:hover { background: #edf4ff; border-color: #8eafe8; }
+.export-btn:disabled { opacity: .6; cursor: wait; }
+body.exporting .top-actions { visibility: hidden; }
+body.exporting .sidebar { display: none !important; }
+body.exporting .main { margin-left: 0 !important; width: 100% !important; }
+body.exporting .filterbar { break-inside: avoid; }
+body.exporting .page:not(.active) { display: none !important; }
+body.exporting .panel, body.exporting .kpi { box-shadow: none !important; break-inside: avoid; }
+@media (max-width: 760px) {
+  .export-btn { padding: 9px 10px; }
+  .export-btn span { display: none; }
+}

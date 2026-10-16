@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -20,7 +21,7 @@
     <div class="sidebar-bottom"><div class="live-dot"></div><span>Google Sheets connection</span><small id="connectionLabel">Connecting…</small></div>
   </aside>
   <main class="main">
-    <header class="topbar"><div><div class="eyebrow">RESUME PERFORMANCE</div><h1 id="pageTitle">Performance Digital AHASS Astra Motor Sumsel</h1><p id="pageSubtitle"></p></div><div class="top-actions"><span class="period-pill" id="periodLabel">Memuat periode…</span><button id="refreshBtn" class="refresh-btn">↻ <span>Perbarui data</span></button></div></header>
+    <header class="topbar"><div><div class="eyebrow">RESUME PERFORMANCE</div><h1 id="pageTitle">Performance Digital AHASS Astra Motor Sumsel</h1><p id="pageSubtitle"></p></div><div class="top-actions"><span class="period-pill" id="periodLabel">Memuat periode…</span><button id="exportJpegBtn" class="export-btn">⇩ <span>Ekspor JPEG</span></button><button id="refreshBtn" class="refresh-btn">↻ <span>Perbarui data</span></button></div></header>
     <div class="filterbar"><label>Kota<select id="cityFilter"><option value="all">Semua kota</option></select></label><label>Grup<select id="groupFilter"><option value="all">Semua grup</option></select></label><label>Status channel<select id="statusFilter"><option value="all">Semua status</option></select></label><label>AHASS<select id="ahassFilter"><option value="all">Semua AHASS</option></select></label><div class="updated">Terakhir diperbarui <strong id="lastUpdated">—</strong></div></div>
     <div id="errorBanner" class="error-banner hidden"></div>
     <section class="page active" id="page-overview">

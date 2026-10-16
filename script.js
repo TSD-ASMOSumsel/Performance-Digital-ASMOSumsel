@@ -144,5 +144,55 @@ function showPage(page){document.querySelectorAll(".nav-item").forEach(b=>b.clas
 ["cityFilter","groupFilter","statusFilter","ahassFilter"].forEach(id=>$(id).addEventListener("change",()=>{populateFilters(false);render()}));
 ["rankMetric","rankLimit","priorityFilter"].forEach(id=>$(id).addEventListener("change",render));
 $("refreshBtn").addEventListener("click",loadData);
+$("exportJpegBtn").addEventListener("click",exportDashboardJpeg);
+
+async function exportDashboardJpeg(){
+  const btn=$("exportJpegBtn");
+  if(!window.html2canvas){
+    alert("Fitur ekspor belum termuat. Periksa koneksi internet lalu coba lagi.");
+    return;
+  }
+  const original=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML="Menyiapkan JPEG…";
+  document.body.classList.add("exporting");
+  try{
+    // Give Chart.js and the browser a moment to finish drawing before capture.
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const target=$("page-overview");
+    const canvas=await html2canvas(document.querySelector(".main"),{
+      backgroundColor:"#f4f7fc",
+      scale:2,
+      useCORS:true,
+      logging:false,
+      windowWidth:Math.max(document.documentElement.scrollWidth,1440),
+      onclone:(doc)=>{
+        doc.body.classList.add("exporting");
+        const clonedMain=doc.querySelector(".main");
+        if(clonedMain){clonedMain.style.width="1440px";clonedMain.style.marginLeft="0";clonedMain.style.padding="28px 34px";}
+        const actions=doc.querySelector(".top-actions");
+        if(actions)actions.style.visibility="hidden";
+        // Export the current page; overview is the recommended dealer report layout.
+        doc.querySelectorAll(".page:not(.active)").forEach(el=>el.style.display="none");
+      }
+    });
+    const link=document.createElement("a");
+    const city=$("cityFilter").value==="all"?"Semua-Kota":$("cityFilter").value;
+    const group=$("groupFilter").value==="all"?"Semua-Grup":$("groupFilter").value;
+    const ahass=$("ahassFilter").value==="all"?"Semua-AHASS":$("ahassFilter").selectedOptions[0].textContent.split(" - ")[0];
+    const safe=s=>String(s).normalize("NFKD").replace(/[^a-zA-Z0-9_-]+/g,"-").replace(/^-|-$/g,"").slice(0,45);
+    link.download=`Laporan-Digital-AHASS-${safe(city)}-${safe(group)}-${safe(ahass)}.jpg`;
+    link.href=canvas.toDataURL("image/jpeg",0.94);
+    link.click();
+  }catch(err){
+    console.error("JPEG export failed:",err);
+    alert("Gagal mengekspor JPEG. Coba lagi setelah dashboard selesai dimuat.");
+  }finally{
+    document.body.classList.remove("exporting");
+    btn.disabled=false;
+    btn.innerHTML=original;
+  }
+}
+
 loadData();
 setInterval(loadData,5*60*1000);

@@ -19,3 +19,7 @@ Dashboard mengambil data dari URL CSV Google Sheets di `script.js` dan memperbar
 
 ## Catatan keamanan
 CSV yang dipublikasikan dapat dibaca publik. Pastikan data yang ditampilkan memang diizinkan untuk diakses publik.
+
+
+## Ekspor laporan JPEG
+Klik tombol **Ekspor JPEG** di kanan atas dashboard. Gambar akan mengikuti filter Kota, Grup, Status Channel, dan AHASS yang sedang aktif. Untuk laporan yang paling mudah dibaca di WhatsApp, gunakan halaman Ringkasan dan pilih filter yang sesuai sebelum mengekspor. Fitur ini menggunakan html2canvas dari CDN sehingga membutuhkan koneksi internet saat dashboard dibuka.
