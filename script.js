@@ -174,11 +174,19 @@ async function exportDashboardJpeg(){
         if(actions)actions.style.visibility="hidden";
         // Export the current page; omit both charts for a compact dealer report.
         doc.querySelectorAll(".page:not(.active)").forEach(el=>el.style.display="none");
-        doc.querySelectorAll("#page-overview .panel").forEach(panel=>{
-          const heading=(panel.querySelector("h2")?.textContent||"").trim().toLowerCase();
-          if(heading.includes("pencapaian per channel")||heading.includes("komposisi kpb digital")){
-            panel.style.display="none";
-          }
+        // Hide the entire chart row in the cloned document. Targeting the
+        // container is more reliable than matching translated chart headings.
+        const chartRow=doc.querySelector("#page-overview .grid-two");
+        if(chartRow){
+          chartRow.style.setProperty("display","none","important");
+          chartRow.style.setProperty("height","0","important");
+          chartRow.style.setProperty("margin","0","important");
+          chartRow.style.setProperty("padding","0","important");
+        }
+        // Fallback: hide any chart panels still present in the export clone.
+        doc.querySelectorAll("#page-overview canvas").forEach(canvas=>{
+          const panel=canvas.closest(".panel");
+          if(panel)panel.style.setProperty("display","none","important");
         });
       }
     });
