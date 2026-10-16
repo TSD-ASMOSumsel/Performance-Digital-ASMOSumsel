@@ -56,18 +56,25 @@ async function loadData(){
   }finally{$("refreshBtn").disabled=false;$("refreshBtn").innerHTML="↻ <span>Refresh data</span>"}
 }
 function populateFilters(){
-  const sets=[["cityFilter","city","Semua kota"],["groupFilter","group","Semua grup"],["statusFilter","status","Semua status"]];
-  sets.forEach(([id,key,allLabel])=>{const select=$(id),old=select.value;const vals=[...new Set(allRows.map(d=>d[key]).filter(Boolean))].sort();select.innerHTML=`<option value="all">${allLabel}</option>`+vals.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");if(vals.includes(old))select.value=old});
+  const citySelect=$("cityFilter"),oldCity=citySelect.value;
+  const cities=[...new Set(allRows.map(d=>d.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"id"));
+  citySelect.innerHTML='<option value="all">Semua kota</option>'+cities.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  if(cities.includes(oldCity))citySelect.value=oldCity;
+
+  const city=citySelect.value;
+  const cityRows=city==="all"?allRows:allRows.filter(d=>d.city===city);
+  [["groupFilter","group","Semua grup"],["statusFilter","status","Semua status"]].forEach(([id,key,allLabel])=>{
+    const select=$(id),old=select.value;
+    const vals=[...new Set(cityRows.map(d=>String(d[key]||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"id"));
+    select.innerHTML=`<option value="all">${allLabel}</option>`+vals.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+    if(vals.includes(old))select.value=old;
+  });
+
   const ahassSelect=$("ahassFilter"),oldAhass=ahassSelect.value;
-  // Use code + name as the unique key so outlets are not collapsed if codes are blank or repeated.
-  const outlets=[...new Map(allRows
-    .filter(d=>String(d.name||"").trim())
-    .map(d=>{
-      const code=String(d.code||"").trim();
-      const name=String(d.name||"").trim();
-      const key=`${code}||${name}`;
-      return [key,{key,code,name,label:code?`${code} - ${name}`:name}];
-    })).values()].sort((a,b)=>a.label.localeCompare(b.label,"id"));
+  const outlets=[...new Map(cityRows.filter(d=>String(d.name||"").trim()).map(d=>{
+    const code=String(d.code||"").trim(),name=String(d.name||"").trim(),key=`${code}||${name}`;
+    return [key,{key,code,name,label:code?`${code} - ${name}`:name}];
+  })).values()].sort((a,b)=>a.label.localeCompare(b.label,"id"));
   ahassSelect.innerHTML='<option value="all">Semua AHASS</option>'+outlets.map(d=>`<option value="${esc(d.key)}">${esc(d.label)}</option>`).join("");
   if(outlets.some(d=>d.key===oldAhass))ahassSelect.value=oldAhass;
 }
@@ -111,7 +118,8 @@ function renderActions(rows){
 document.querySelectorAll(".nav-item").forEach(btn=>btn.addEventListener("click",()=>showPage(btn.dataset.page)));
 document.querySelectorAll("[data-goto]").forEach(btn=>btn.addEventListener("click",()=>showPage(btn.dataset.goto)));
 function showPage(page){document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id==="page-"+page));$("pageTitle").textContent=titles[page][0];$("pageSubtitle").textContent=titles[page][1];if(charts.achievementChart||charts.channelChart)Object.values(charts).forEach(c=>c.resize())}
-["cityFilter","groupFilter","statusFilter","ahassFilter","rankMetric","rankLimit","priorityFilter"].forEach(id=>$(id).addEventListener("change",render));
+$("cityFilter").addEventListener("change",()=>{populateFilters();render()});
+["groupFilter","statusFilter","ahassFilter","rankMetric","rankLimit","priorityFilter"].forEach(id=>$(id).addEventListener("change",render));
 $("refreshBtn").addEventListener("click",loadData);
 loadData();
 setInterval(loadData,5*60*1000);
