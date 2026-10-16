@@ -55,19 +55,23 @@ async function loadData(){
     if(!allRows.length){$("periodLabel").textContent="Data tidak tersedia";["kpiDigital","kpiBooking","kpiPay","kpiOutlets"].forEach(id=>$(id).textContent="—")}
   }finally{$("refreshBtn").disabled=false;$("refreshBtn").innerHTML="↻ <span>Refresh data</span>"}
 }
-function populateFilters(){
-  const citySelect=$("cityFilter"),oldCity=citySelect.value;
-  const cities=[...new Set(allRows.map(d=>d.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"id"));
+function populateFilters(resetDependents=false){
+  const citySelect=$("cityFilter");
+  const selectedCity=citySelect.value;
+  const cities=[...new Set(allRows.map(d=>String(d.city||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"id"));
   citySelect.innerHTML='<option value="all">Semua kota</option>'+cities.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
-  if(cities.includes(oldCity))citySelect.value=oldCity;
+  citySelect.value=cities.includes(selectedCity)?selectedCity:"all";
 
   const city=citySelect.value;
-  const cityRows=city==="all"?allRows:allRows.filter(d=>d.city===city);
+  const cityRows=city==="all"?allRows:allRows.filter(d=>String(d.city||"").trim()===city);
+
+  // Reset dependent selections when the district changes, so a stale AHASS/group
+  // selection cannot silently leave the dashboard showing zero results.
   [["groupFilter","group","Semua grup"],["statusFilter","status","Semua status"]].forEach(([id,key,allLabel])=>{
     const select=$(id),old=select.value;
     const vals=[...new Set(cityRows.map(d=>String(d[key]||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"id"));
     select.innerHTML=`<option value="all">${allLabel}</option>`+vals.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
-    if(vals.includes(old))select.value=old;
+    select.value=!resetDependents&&vals.includes(old)?old:"all";
   });
 
   const ahassSelect=$("ahassFilter"),oldAhass=ahassSelect.value;
@@ -76,10 +80,19 @@ function populateFilters(){
     return [key,{key,code,name,label:code?`${code} - ${name}`:name}];
   })).values()].sort((a,b)=>a.label.localeCompare(b.label,"id"));
   ahassSelect.innerHTML='<option value="all">Semua AHASS</option>'+outlets.map(d=>`<option value="${esc(d.key)}">${esc(d.label)}</option>`).join("");
-  if(outlets.some(d=>d.key===oldAhass))ahassSelect.value=oldAhass;
+  ahassSelect.value=!resetDependents&&outlets.some(d=>d.key===oldAhass)?oldAhass:"all";
 }
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function filtered(){const selectedAhass=$("ahassFilter").value;return allRows.filter(d=>["city","group","status"].every(k=>{const v=$(({city:"cityFilter",group:"groupFilter",status:"statusFilter"})[k]).value;return v==="all"||d[k]===v})&&(selectedAhass==="all"||`${String(d.code||"").trim()}||${String(d.name||"").trim()}`===selectedAhass))}
+function filtered(){
+  const selectedAhass=$("ahassFilter").value;
+  return allRows.filter(d=>{
+    const city=$("cityFilter").value,group=$("groupFilter").value,status=$("statusFilter").value;
+    return (city==="all"||String(d.city||"").trim()===city)
+      &&(group==="all"||String(d.group||"").trim()===group)
+      &&(status==="all"||String(d.status||"").trim()===status)
+      &&(selectedAhass==="all"||`${String(d.code||"").trim()}||${String(d.name||"").trim()}`===selectedAhass);
+  });
+}
 function aggregate(rows){return rows.reduce((a,d)=>{["kpbTotal","kpbDigital","kpbNonBooking","kpbBooking","bookingTarget","bookingActual","payTarget","payActual"].forEach(k=>a[k]+=d[k]);return a},{kpbTotal:0,kpbDigital:0,kpbNonBooking:0,kpbBooking:0,bookingTarget:0,bookingActual:0,payTarget:0,payActual:0})}
 function chart(id,config){if(charts[id])charts[id].destroy();const el=$(id);if(el)charts[id]=new Chart(el,config)}
 function baseOptions(){return {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:"#142b49",padding:10,titleFont:{family:"DM Sans"},bodyFont:{family:"DM Sans"}}},scales:{x:{grid:{display:false},ticks:{color:"#8c98aa",font:{family:"DM Sans",size:10}}},y:{grid:{color:"#eef1f6"},ticks:{color:"#8c98aa",font:{family:"DM Sans",size:10}}}}}}
@@ -118,7 +131,7 @@ function renderActions(rows){
 document.querySelectorAll(".nav-item").forEach(btn=>btn.addEventListener("click",()=>showPage(btn.dataset.page)));
 document.querySelectorAll("[data-goto]").forEach(btn=>btn.addEventListener("click",()=>showPage(btn.dataset.goto)));
 function showPage(page){document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id==="page-"+page));$("pageTitle").textContent=titles[page][0];$("pageSubtitle").textContent=titles[page][1];if(charts.achievementChart||charts.channelChart)Object.values(charts).forEach(c=>c.resize())}
-$("cityFilter").addEventListener("change",()=>{populateFilters();render()});
+$("cityFilter").addEventListener("change",()=>{populateFilters(true);render()});
 ["groupFilter","statusFilter","ahassFilter","rankMetric","rankLimit","priorityFilter"].forEach(id=>$(id).addEventListener("change",render));
 $("refreshBtn").addEventListener("click",loadData);
 loadData();
