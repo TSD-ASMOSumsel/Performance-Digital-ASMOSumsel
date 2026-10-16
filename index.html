@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AHASS Digital Performance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">A</div><div><strong>AHASS Digital</strong><small>PUSAT KINERJA</small></div></div>
+    <div class="nav-label">MENU UTAMA</div>
+    <button class="nav-item active" data-page="overview"><span>◫</span> Ringkasan</button>
+    <button class="nav-item" data-page="channels"><span>◷</span> Analisis Channel</button>
+    <button class="nav-item" data-page="ranking"><span>↕</span> Peringkat AHASS</button>
+    <button class="nav-item" data-page="actions"><span>◎</span> Prioritas Tindak Lanjut</button>
+    <div class="sidebar-bottom"><div class="live-dot"></div><span>Google Sheets connection</span><small id="connectionLabel">Connecting…</small></div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><div><div class="eyebrow">RESUME PERFORMANCE</div><h1 id="pageTitle">Performance Digital AHASS Astra Motor Sumsel</h1><p id="pageSubtitle"></p></div><div class="top-actions"><span class="period-pill" id="periodLabel">Memuat periode…</span><button id="refreshBtn" class="refresh-btn">↻ <span>Perbarui data</span></button></div></header>
+    <div class="filterbar"><label>Kota<select id="cityFilter"><option value="all">Semua kota</option></select></label><label>Grup<select id="groupFilter"><option value="all">Semua grup</option></select></label><label>Status channel<select id="statusFilter"><option value="all">Semua status</option></select></label><div class="updated">Terakhir diperbarui <strong id="lastUpdated">—</strong></div></div>
+    <div id="errorBanner" class="error-banner hidden"></div>
+    <section class="page active" id="page-overview">
+      <div class="kpi-grid">
+        <article class="kpi"><div class="kpi-top"><span>Presentase KPB Digital</span><span class="kpi-icon blue">↗</span></div><div class="kpi-value" id="kpiDigital">—</div><div class="kpi-foot"><span id="digitalCount">—</span> KPB digital / total KPB</div></article>
+        <article class="kpi"><div class="kpi-top"><span>Pencapaian Booking</span><span class="kpi-icon purple">▣</span></div><div class="kpi-value" id="kpiBooking">—</div><div class="kpi-foot"><span id="bookingCount">—</span> aktual / target booking</div></article>
+        <article class="kpi"><div class="kpi-top"><span>Pencapaian AstraPay</span><span class="kpi-icon green">◎</span></div><div class="kpi-value" id="kpiPay">—</div><div class="kpi-foot"><span id="payCount">—</span> aktual / target transaksi</div></article>
+        <article class="kpi"><div class="kpi-top"><span>Jumlah AHASS</span><span class="kpi-icon amber">⌂</span></div><div class="kpi-value" id="kpiOutlets">—</div><div class="kpi-foot">AHASS sesuai filter aktif</div></article>
+      </div>
+      <div class="grid-two">
+        <article class="panel"><div class="panel-head"><div><h2>Pencapaian per channel</h2><p>Realisasi dibanding target berdasarkan filter aktif</p></div></div><div class="chart-wrap"><canvas id="achievementChart"></canvas></div></article>
+        <article class="panel"><div class="panel-head"><div><h2>Komposisi KPB Digital</h2><p>KPB digital dibanding total volume KPB</p></div></div><div class="chart-wrap"><canvas id="mixChart"></canvas></div><div class="mini-legend"><span><i class="legend-blue"></i>KPB Digital</span><span><i class="legend-gray"></i>KPB non-digital</span></div></article>
+      </div>
+      <article class="panel"><div class="panel-head"><div><h2>Daftar pantauan kinerja</h2><p>AHASS dengan kesenjangan terbesar terhadap target channel</p></div><button class="text-btn" data-goto="actions">Lihat semua tindak lanjut →</button></div><div class="table-wrap"><table><thead><tr><th>AHASS</th><th>Kota</th><th>KPB Digital</th><th>Pencapaian Booking</th><th>Pencapaian AstraPay</th><th>Priority</th></tr></thead><tbody id="watchlistBody"></tbody></table></div></article>
+    </section>
+    <section class="page" id="page-channels">
+      <div class="section-intro"><h2>Analisis Channel</h2><p>Compare adoption and target achievement across KPB Digital, Booking Service, and AstraPay.</p></div>
+      <div class="grid-two">
+        <article class="panel"><div class="panel-head"><div><h2>Pencapaian per channel</h2><p>Persentase target tercapai</p></div></div><div class="chart-wrap tall"><canvas id="channelChart"></canvas></div></article>
+        <article class="panel"><div class="panel-head"><div><h2>Presentase KPB Digital berdasarkan status</h2><p>Status channel H123, H23, dan SO</p></div></div><div class="chart-wrap tall"><canvas id="statusChart"></canvas></div></article>
+      </div>
+      <article class="panel"><div class="panel-head"><div><h2>Ringkasan channel</h2><p>Kinerja agregat berdasarkan filter aktif</p></div></div><div id="channelSummary" class="channel-summary"></div></article>
+    </section>
+    <section class="page" id="page-ranking">
+      <div class="section-intro"><h2>Peringkat AHASS</h2><p>Sort outlets by digital adoption or achievement to find leaders and lagging outlets.</p></div>
+      <article class="panel"><div class="ranking-controls"><label>Urutkan berdasarkan<select id="rankMetric"><option value="digitalShare">Presentase KPB Digital</option><option value="bookingAch">Pencapaian Booking</option><option value="payAch">Pencapaian AstraPay</option></select></label><label>Tampilkan<select id="rankLimit"><option>10</option><option>20</option><option>50</option><option>100</option></select></label></div><div class="table-wrap"><table><thead><tr><th>#</th><th>AHASS</th><th>Kota</th><th>Grup</th><th>Presentase KPB Digital</th><th>Pencapaian Booking</th><th>Pencapaian AstraPay</th></tr></thead><tbody id="rankingBody"></tbody></table></div></article>
+    </section>
+    <section class="page" id="page-actions">
+      <div class="section-intro"><h2>Prioritas Tindak Lanjut</h2><p>Action list generated from current achievement gaps. Use it to focus follow-up by outlet.</p></div>
+      <div class="action-kpis" id="actionKpis"></div>
+      <article class="panel"><div class="panel-head"><div><h2>Daftar tindak lanjut AHASS</h2><p>Diurutkan berdasarkan tingkat prioritas dan pencapaian terendah</p></div><label class="inline-filter">Priority<select id="priorityFilter"><option value="all">Semua prioritas</option><option value="Kritis">Kritis</option><option value="Tinggi">Tinggi</option><option value="Pantau">Pantau</option></select></label></div><div class="table-wrap"><table><thead><tr><th>Priority</th><th>AHASS</th><th>Kota</th><th>Kekurangan terhadap target booking</th><th>Kekurangan terhadap target AstraPay</th><th>Fokus tindak lanjut</th></tr></thead><tbody id="actionsBody"></tbody></table></div></article>
+    </section>
+    <footer>AHASS Digital Performance Dashboard <span>•</span> Sumber data: CSV Google Sheets yang dipublikasikan</footer>
+  </main>
+  <script src="script.js"></script>
+</body></html>
