@@ -59,12 +59,20 @@ function populateFilters(){
   const sets=[["cityFilter","city","Semua kota"],["groupFilter","group","Semua grup"],["statusFilter","status","Semua status"]];
   sets.forEach(([id,key,allLabel])=>{const select=$(id),old=select.value;const vals=[...new Set(allRows.map(d=>d[key]).filter(Boolean))].sort();select.innerHTML=`<option value="all">${allLabel}</option>`+vals.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");if(vals.includes(old))select.value=old});
   const ahassSelect=$("ahassFilter"),oldAhass=ahassSelect.value;
-  const outlets=[...new Map(allRows.map(d=>[d.code,{code:d.code,label:`${d.code} - ${d.name}`}])).values()].sort((a,b)=>a.label.localeCompare(b.label));
-  ahassSelect.innerHTML='<option value="all">Semua AHASS</option>'+outlets.map(d=>`<option value="${esc(d.code)}">${esc(d.label)}</option>`).join("");
-  if(outlets.some(d=>d.code===oldAhass))ahassSelect.value=oldAhass;
+  // Use code + name as the unique key so outlets are not collapsed if codes are blank or repeated.
+  const outlets=[...new Map(allRows
+    .filter(d=>String(d.name||"").trim())
+    .map(d=>{
+      const code=String(d.code||"").trim();
+      const name=String(d.name||"").trim();
+      const key=`${code}||${name}`;
+      return [key,{key,code,name,label:code?`${code} - ${name}`:name}];
+    })).values()].sort((a,b)=>a.label.localeCompare(b.label,"id"));
+  ahassSelect.innerHTML='<option value="all">Semua AHASS</option>'+outlets.map(d=>`<option value="${esc(d.key)}">${esc(d.label)}</option>`).join("");
+  if(outlets.some(d=>d.key===oldAhass))ahassSelect.value=oldAhass;
 }
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function filtered(){return allRows.filter(d=>["city","group","status"].every(k=>{const v=$(({city:"cityFilter",group:"groupFilter",status:"statusFilter"})[k]).value;return v==="all"||d[k]===v})&&($("ahassFilter").value==="all"||d.code===$("ahassFilter").value))}
+function filtered(){const selectedAhass=$("ahassFilter").value;return allRows.filter(d=>["city","group","status"].every(k=>{const v=$(({city:"cityFilter",group:"groupFilter",status:"statusFilter"})[k]).value;return v==="all"||d[k]===v})&&(selectedAhass==="all"||`${String(d.code||"").trim()}||${String(d.name||"").trim()}`===selectedAhass))}
 function aggregate(rows){return rows.reduce((a,d)=>{["kpbTotal","kpbDigital","kpbNonBooking","kpbBooking","bookingTarget","bookingActual","payTarget","payActual"].forEach(k=>a[k]+=d[k]);return a},{kpbTotal:0,kpbDigital:0,kpbNonBooking:0,kpbBooking:0,bookingTarget:0,bookingActual:0,payTarget:0,payActual:0})}
 function chart(id,config){if(charts[id])charts[id].destroy();const el=$(id);if(el)charts[id]=new Chart(el,config)}
 function baseOptions(){return {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:"#142b49",padding:10,titleFont:{family:"DM Sans"},bodyFont:{family:"DM Sans"}}},scales:{x:{grid:{display:false},ticks:{color:"#8c98aa",font:{family:"DM Sans",size:10}}},y:{grid:{color:"#eef1f6"},ticks:{color:"#8c98aa",font:{family:"DM Sans",size:10}}}}}}
