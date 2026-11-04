@@ -1,11 +1,20 @@
 // Performance Digital AHASS Astra Motor Sumsel — October/November 2026
 const SOURCES={oct:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSpfQ6QbaY7qp8UfRQk0-6cJDwU-6aQDuEnJ9KnbgIQfAwdJphWKnaS6imavvwBDw/pub?gid=607615076&single=true&output=csv',nov:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSpfQ6QbaY7qp8UfRQk0-6cJDwU-6aQDuEnJ9KnbgIQfAwdJphWKnaS6imavvwBDw/pub?gid=1286174024&single=true&output=csv'};
-const REFRESH_MS=300000; let allData={oct:[],nov:[]}, currentPeriod='oct', charts={};
+const REFRESH_MS=300000; let allData={oct:[],nov:[]}, statusSummary={oct:{},nov:{}}, currentPeriod='oct', charts={};
 const $=id=>document.getElementById(id), fmt=n=>Math.round(Number(n)||0).toLocaleString('id-ID'), pct=(a,b)=>b>0?a/b*100:null, pctText=n=>n==null?'—':n.toLocaleString('id-ID',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function num(v){if(typeof v==='number')return v;let s=String(v??'').trim().replace(/%/g,'').replace(/\s/g,'');if(!s)return 0;if(s.includes(',')&&s.includes('.'))s=s.replace(/\./g,'').replace(',','.');else if(s.includes(','))s=s.replace(',','.');let n=Number(s);return Number.isFinite(n)?n:0}
 function normalizeCsv(csv){const rows=Papa.parse(csv,{skipEmptyLines:false}).data;const out=[];for(let i=5;i<rows.length;i++){const r=rows[i]||[];const code=String(r[5]??'').trim(),name=String(r[7]??'').trim();if(!code||!name||name==='#NAME?')continue;out.push({se:String(r[0]||'').trim(),group:String(r[1]||'').trim()||'—',city:String(r[3]||'').trim()||'—',status:String(r[4]||'').trim().toUpperCase()||'—',code:code.padStart(5,'0'),name,kpbTarget:num(r[9]),kpbDigital:num(r[12]),bookingTarget:num(r[14]),bookingActual:num(r[15]),astraTarget:num(r[17]),astraActual:num(r[18])});}return out}
-async function loadPeriod(period){const response=await fetch(SOURCES[period]+'&_='+Date.now(),{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);const text=await response.text();if(!text||text.trim().startsWith('<'))throw Error('CSV tidak dapat dibaca. Pastikan tab dipublikasikan sebagai CSV.');const rows=normalizeCsv(text);if(!rows.length)throw Error('Tidak ada baris AHASS yang terbaca.');allData[period]=rows;return rows}
+async function loadPeriod(period){const response=await fetch(SOURCES[period]+'&_='+Date.now(),{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);const text=await response.text();if(!text||text.trim().startsWith('<'))throw Error('CSV tidak dapat dibaca. Pastikan tab dipublikasikan sebagai CSV.');const parsed=Papa.parse(text,{skipEmptyLines:false}).data;
+const summary={};
+for(const row of parsed){
+  const st=String(row?.[21]??'').trim().toUpperCase();
+  if(['H123','H23','SO','TOTAL'].includes(st)){
+    summary[st]={kpbTarget:num(row[22]),kpbDigital:num(row[23]),bookingTarget:num(row[25]),bookingActual:num(row[26]),astraTarget:num(row[28]),astraActual:num(row[29])};
+  }
+}
+const rows=normalizeCsv(text);if(!rows.length)throw Error('Tidak ada baris AHASS yang terbaca.');
+allData[period]=rows;statusSummary[period]=summary;return rows}
 function currentRows(){return allData[currentPeriod]||[]}
 function selectedRows(){let rows=currentRows();const city=$('cityFilter').value,group=$('groupFilter').value,status=$('statusFilter').value,ahass=$('ahassFilter').value;return rows.filter(r=>(city==='all'||r.city===city)&&(group==='all'||r.group===group)&&(status==='all'||r.status===status)&&(ahass==='all'||r.code+'||'+r.name===ahass))}
 function aggregate(rows){return rows.reduce((a,r)=>{a.kpbTarget+=r.kpbTarget;a.kpbDigital+=r.kpbDigital;a.bookingTarget+=r.bookingTarget;a.bookingActual+=r.bookingActual;a.astraTarget+=r.astraTarget;a.astraActual+=r.astraActual;return a},{kpbTarget:0,kpbDigital:0,bookingTarget:0,bookingActual:0,astraTarget:0,astraActual:0})}
@@ -22,7 +31,14 @@ const metrics=[['KPB Digital',k],['Booking Service',b],['AstraPay',a]];chart('ac
 // Channel chart: calculate each status achievement from summed actual / summed target.
 // Do not use pre-calculated row percentages or raw actual totals as chart values.
 const statuses=[...new Set(rows.map(r=>r.status))].sort();
-const statusAggregates=statuses.map(status=>({status,...aggregate(rows.filter(r=>r.status===status))}));
+const statusAggregates=statuses.map(status=>{
+  const rowAggregate=aggregate(rows.filter(r=>r.status===status));
+  // Published workbook includes an authoritative status-level summary block at columns V:AD.
+  // Use its KPB target/actual values when the dashboard is showing the complete dataset.
+  const summary=statusSummary[currentPeriod]?.[status];
+  const noNarrowing=$('cityFilter').value==='all'&&$('groupFilter').value==='all'&&$('ahassFilter').value==='all';
+  return {status,...(summary&&noNarrowing?summary:rowAggregate)};
+});
 const statusMetricMap={
   'KPB Digital':{actual:'kpbDigital',target:'kpbTarget'},
   'Booking':{actual:'bookingActual',target:'bookingTarget'},
