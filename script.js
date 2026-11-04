@@ -1,229 +1,34 @@
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSpfQ6QbaY7qp8UfRQk0-6cJDwU-6aQDuEnJ9KnbgIQfAwdJphWKnaS6imavvwBDw/pub?gid=607615076&single=true&output=csv";
-const $ = id => document.getElementById(id);
-let allRows = [], charts = {};
-const titles = {overview:["Performance Digital AHASS Astra Motor Sumsel",""],channels:["Analisis Channel","Bandingkan adopsi dan pencapaian target pada tiga channel digital."],ranking:["Peringkat AHASS","Identifikasi AHASS dengan kinerja terbaik dan yang perlu ditingkatkan."],actions:["Prioritas Tindak Lanjut","Fokuskan tindak lanjut pada AHASS dengan kesenjangan target terbesar."]};
-function num(v){if(v===null||v===undefined)return 0;let s=String(v).trim().replace(/%/g,"").replace(/,/g,"");if(!s||s==="#"||s.startsWith("#"))return 0;let n=Number(s);return Number.isFinite(n)?n:0}
-function pct(v){if(v===null||v===undefined)return 0;let s=String(v).trim();if(s.includes("%"))return num(s)/100;let n=num(s);return n>1?n/100:n}
-function fmt(n){return Math.round(n||0).toLocaleString("en-US")}
-function percent(n){return `${(n*100).toFixed(1)}%`}
-function statusClass(metric, value){
-  const threshold = metric === "digitalShare" ? [0.8,0.9] : [0.7,0.9];
-  return value < threshold[0] ? "red" : value < threshold[1] ? "yellow" : "green";
+// Performance Digital AHASS Astra Motor Sumsel — October/November 2026
+const SOURCES={oct:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSpfQ6QbaY7qp8UfRQk0-6cJDwU-6aQDuEnJ9KnbgIQfAwdJphWKnaS6imavvwBDw/pub?gid=607615076&single=true&output=csv',nov:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSpfQ6QbaY7qp8UfRQk0-6cJDwU-6aQDuEnJ9KnbgIQfAwdJphWKnaS6imavvwBDw/pub?gid=1286174024&single=true&output=csv'};
+const REFRESH_MS=300000; let allData={oct:[],nov:[]}, currentPeriod='oct', charts={};
+const $=id=>document.getElementById(id), fmt=n=>Math.round(Number(n)||0).toLocaleString('id-ID'), pct=(a,b)=>b>0?a/b*100:null, pctText=n=>n==null?'—':n.toLocaleString('id-ID',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function num(v){if(typeof v==='number')return v;let s=String(v??'').trim().replace(/%/g,'').replace(/\s/g,'');if(!s)return 0;if(s.includes(',')&&s.includes('.'))s=s.replace(/\./g,'').replace(',','.');else if(s.includes(','))s=s.replace(',','.');let n=Number(s);return Number.isFinite(n)?n:0}
+function normalizeCsv(csv){const rows=Papa.parse(csv,{skipEmptyLines:false}).data;const out=[];for(let i=5;i<rows.length;i++){const r=rows[i]||[];const code=String(r[5]??'').trim(),name=String(r[7]??'').trim();if(!code||!name||name==='#NAME?')continue;out.push({se:String(r[0]||'').trim(),group:String(r[1]||'').trim()||'—',city:String(r[3]||'').trim()||'—',status:String(r[4]||'').trim().toUpperCase()||'—',code:code.padStart(5,'0'),name,kpbTarget:num(r[9]),kpbDigital:num(r[12]),bookingTarget:num(r[14]),bookingActual:num(r[15]),astraTarget:num(r[17]),astraActual:num(r[18])});}return out}
+async function loadPeriod(period){const response=await fetch(SOURCES[period]+'&_='+Date.now(),{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);const text=await response.text();if(!text||text.trim().startsWith('<'))throw Error('CSV tidak dapat dibaca. Pastikan tab dipublikasikan sebagai CSV.');const rows=normalizeCsv(text);if(!rows.length)throw Error('Tidak ada baris AHASS yang terbaca.');allData[period]=rows;return rows}
+function currentRows(){return allData[currentPeriod]||[]}
+function selectedRows(){let rows=currentRows();const city=$('cityFilter').value,group=$('groupFilter').value,status=$('statusFilter').value,ahass=$('ahassFilter').value;return rows.filter(r=>(city==='all'||r.city===city)&&(group==='all'||r.group===group)&&(status==='all'||r.status===status)&&(ahass==='all'||r.code+'||'+r.name===ahass))}
+function aggregate(rows){return rows.reduce((a,r)=>{a.kpbTarget+=r.kpbTarget;a.kpbDigital+=r.kpbDigital;a.bookingTarget+=r.bookingTarget;a.bookingActual+=r.bookingActual;a.astraTarget+=r.astraTarget;a.astraActual+=r.astraActual;return a},{kpbTarget:0,kpbDigital:0,bookingTarget:0,bookingActual:0,astraTarget:0,astraActual:0})}
+function rateClass(v,key){if(v==null)return '';const low=key==='kpb'?80:70,mid=key==='kpb'?90:90;return v<low?'bad':v<mid?'warn':'good'}
+function metric(v,actual,target,key){return `<span class="metric ${rateClass(v,key)}">${pctText(v)} (${fmt(actual)} / ${fmt(target)})</span>`}
+function priority(r){const a=[{key:'kpb',label:'KPB Digital',v:pct(r.kpbDigital,r.kpbTarget),actual:r.kpbDigital,target:r.kpbTarget,gap:Math.max(0,r.kpbTarget-r.kpbDigital),tip:'Perkuat edukasi dan konsistensi penggunaan proses KPB Digital.'},{key:'booking',label:'Booking Service',v:pct(r.bookingActual,r.bookingTarget),actual:r.bookingActual,target:r.bookingTarget,gap:Math.max(0,r.bookingTarget-r.bookingActual),tip:'Tingkatkan follow-up pelanggan dan disiplin pencatatan booking harian.'},{key:'astra',label:'AstraPay',v:pct(r.astraActual,r.astraTarget),actual:r.astraActual,target:r.astraTarget,gap:Math.max(0,r.astraTarget-r.astraActual),tip:'Perkuat penawaran AstraPay di area service reception dan pantau transaksi harian.'}].filter(x=>x.target>0);a.sort((x,y)=>x.v-y.v);const w=a[0]||{key:'booking',label:'Booking Service',v:null,actual:0,target:0,gap:0,tip:'Validasi target dan aktual.'};const level=w.v<50?'high':w.v<80?'medium':'low';return {...w,level}}
+function optionsFor(id,values,selected){const el=$(id),old=selected??el.value;el.innerHTML='<option value="all">'+({city:'Semua Kota',group:'Semua Grup',status:'Semua Status',ahass:'Semua AHASS'}[id.replace('Filter','')])+'</option>'+values.map(v=>`<option value="${esc(v.value)}">${esc(v.label)}</option>`).join('');el.value=[...el.options].some(o=>o.value===old)?old:'all'}
+function refreshFilters(changed){const base=currentRows();const vals={city:new Set(),group:new Set(),status:new Set(),ahass:new Map()};const chosen={city:$('cityFilter').value,group:$('groupFilter').value,status:$('statusFilter').value,ahass:$('ahassFilter').value};for(const r of base){if(chosen.city!=='all'&&r.city!==chosen.city&&changed!=='city')continue;if(chosen.group!=='all'&&r.group!==chosen.group&&changed!=='group')continue;if(chosen.status!=='all'&&r.status!==chosen.status&&changed!=='status')continue;if(chosen.ahass!=='all'&&r.code+'||'+r.name!==chosen.ahass&&changed!=='ahass')continue;vals.city.add(r.city);vals.group.add(r.group);vals.status.add(r.status);vals.ahass.set(r.code+'||'+r.name,r)}
+optionsFor('cityFilter',[...vals.city].sort().map(v=>({value:v,label:v})),chosen.city);optionsFor('groupFilter',[...vals.group].sort().map(v=>({value:v,label:v})),chosen.group);optionsFor('statusFilter',[...vals.status].sort().map(v=>({value:v,label:v})),chosen.status);optionsFor('ahassFilter',[...vals.ahass.values()].sort((a,b)=>a.name.localeCompare(b.name)).map(r=>({value:r.code+'||'+r.name,label:r.code+' - '+r.name})),chosen.ahass)}
+function chart(id,type,data,options={}){if(charts[id])charts[id].destroy();const el=$(id);if(!el)return;charts[id]=new Chart(el,{type,data,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{usePointStyle:true,boxWidth:8,font:{family:'DM Sans',size:10}}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'#edf0f4'}}},...options}})}
+function draw(){const rows=selectedRows(),t=aggregate(rows),k=pct(t.kpbDigital,t.kpbTarget),b=pct(t.bookingActual,t.bookingTarget),a=pct(t.astraActual,t.astraTarget);$('kpiKpb').textContent=pctText(k);$('kpiBooking').textContent=pctText(b);$('kpiAstra').textContent=pctText(a);$('kpiOutlets').textContent=fmt(rows.length);$('kpiKpbDetail').textContent=`${fmt(t.kpbDigital)} / ${fmt(t.kpbTarget)} KPB`; $('kpiBookingDetail').textContent=`${fmt(t.bookingActual)} / ${fmt(t.bookingTarget)} booking`;$('kpiAstraDetail').textContent=`${fmt(t.astraActual)} / ${fmt(t.astraTarget)} transaksi`;
+[['barKpb',k],['barBooking',b],['barAstra',a]].forEach(([id,v])=>$(id).style.width=Math.max(0,Math.min(100,v||0))+'%');$('periodTag').textContent=currentPeriod==='oct'?'OKTOBER 2026':'NOVEMBER 2026';
+const metrics=[['KPB Digital',k],['Booking Service',b],['AstraPay',a]];chart('achievementChart','bar',{labels:metrics.map(x=>x[0]),datasets:[{data:metrics.map(x=>x[1]||0),backgroundColor:['#d9273e','#2188bd','#e3ad25'],borderRadius:5,barThickness:24}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{min:0,max:100,ticks:{callback:v=>v+'%'}}}});
+const statuses=[...new Set(rows.map(r=>r.status))].sort();chart('channelChart','bar',{labels:statuses,datasets:[{label:'KPB Digital',data:statuses.map(s=>{const q=aggregate(rows.filter(r=>r.status===s));return pct(q.kpbDigital,q.kpbTarget)||0}),backgroundColor:'#d9273e'},{label:'Booking',data:statuses.map(s=>{const q=aggregate(rows.filter(r=>r.status===s));return pct(q.bookingActual,q.bookingTarget)||0}),backgroundColor:'#2188bd'},{label:'AstraPay',data:statuses.map(s=>{const q=aggregate(rows.filter(r=>r.status===s));return pct(q.astraActual,q.astraTarget)||0}),backgroundColor:'#e3ad25'}]},{scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'}}}});
+const priorities=rows.map(r=>({r,p:priority(r)})).sort((x,y)=>(x.p.v??999)-(y.p.v??999));$('overviewRows').innerHTML=priorities.slice(0,7).map(({r,p})=>`<tr><td>${esc(r.code)} - ${esc(r.name)}</td><td>${esc(r.status)}</td><td>${metric(pct(r.kpbDigital,r.kpbTarget),r.kpbDigital,r.kpbTarget,'kpb')}</td><td>${metric(pct(r.bookingActual,r.bookingTarget),r.bookingActual,r.bookingTarget,'booking')}</td><td>${metric(pct(r.astraActual,r.astraTarget),r.astraActual,r.astraTarget,'astra')}</td><td><span class="priority ${p.level}">${p.level.toUpperCase()}</span></td></tr>`).join('')||'<tr><td colspan="6" class="empty">Tidak ada data.</td></tr>';
+const labels=rows.map(r=>r.code);chart('kpbChart','bar',{labels,datasets:[{label:'Target KPB',data:rows.map(r=>r.kpbTarget),backgroundColor:'#f2c6cb'},{label:'KPB Digital',data:rows.map(r=>r.kpbDigital),backgroundColor:'#d9273e'}]},{scales:{x:{ticks:{maxRotation:60,minRotation:45}}}});chart('bookingChart','bar',{labels,datasets:[{label:'Target Booking',data:rows.map(r=>r.bookingTarget),backgroundColor:'#c9e2f0'},{label:'Actual Booking',data:rows.map(r=>r.bookingActual),backgroundColor:'#2188bd'}]},{scales:{x:{ticks:{maxRotation:60,minRotation:45}}}});chart('astraChart','bar',{labels,datasets:[{label:'Target AstraPay',data:rows.map(r=>r.astraTarget),backgroundColor:'#f5e4b5'},{label:'Actual AstraPay',data:rows.map(r=>r.astraActual),backgroundColor:'#e3ad25'}]},{scales:{x:{ticks:{maxRotation:60,minRotation:45}}}});
+$('channelRows').innerHTML=[['KPB Digital',t.kpbDigital,t.kpbTarget,k],['Booking Service',t.bookingActual,t.bookingTarget,b],['AstraPay',t.astraActual,t.astraTarget,a]].map(x=>`<tr><td>${x[0]}</td><td>${fmt(x[1])}</td><td>${fmt(x[2])}</td><td>${metric(x[3],x[1],x[2],x[0]==='KPB Digital'?'kpb':'booking')}</td></tr>`).join('');
+const q=$('searchAhass').value.toLowerCase(),metricKey=$('rankingMetric').value;const sorted=rows.filter(r=>(r.name+' '+r.city+' '+r.code).toLowerCase().includes(q)).sort((x,y)=>(pct(y[metricKey==='kpb'?'kpbDigital':metricKey==='booking'?'bookingActual':'astraActual'],y[metricKey==='kpb'?'kpbTarget':metricKey==='booking'?'bookingTarget':'astraTarget'])??-1)-(pct(x[metricKey==='kpb'?'kpbDigital':metricKey==='booking'?'bookingActual':'astraActual'],x[metricKey==='kpb'?'kpbTarget':metricKey==='booking'?'bookingTarget':'astraTarget'])??-1));$('rankingRows').innerHTML=sorted.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.city)}</td><td>${esc(r.group)}</td><td>${esc(r.status)}</td><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${metric(pct(r.kpbDigital,r.kpbTarget),r.kpbDigital,r.kpbTarget,'kpb')}</td><td>${metric(pct(r.bookingActual,r.bookingTarget),r.bookingActual,r.bookingTarget,'booking')}</td><td>${metric(pct(r.astraActual,r.astraTarget),r.astraActual,r.astraTarget,'astra')}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">Tidak ada data.</td></tr>';$('rankingCount').textContent=`Menampilkan ${sorted.length} dari ${rows.length} AHASS`;
+const filter=$('priorityFilter').value,act=priorities.filter(x=>filter==='all'||x.p.level===filter);const counts=['high','medium','low'].map(l=>[l,priorities.filter(x=>x.p.level===l).length]);$('prioritySummary').innerHTML=counts.map(([l,n])=>`<div class="priority-box"><span>Prioritas ${l==='high'?'Tinggi':l==='medium'?'Menengah':'Rendah'}</span><b>${n}</b></div>`).join('');$('actionRows').innerHTML=act.map(({r,p})=>`<tr><td><span class="priority ${p.level}">${p.level.toUpperCase()}</span></td><td>${esc(r.code)} - ${esc(r.name)}<br><small>${esc(r.city)} • ${esc(r.status)}</small></td><td>${p.label}</td><td>${pctText(p.v)}</td><td>${fmt(p.actual)} / ${fmt(p.target)}</td><td>${p.tip}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Tidak ada data.</td></tr>';
 }
-function coloredPercent(metric,value){return `<span class="metric-status ${statusClass(metric,value)}">${percent(value)}</span>`}
-function achievementCell(metric,value,actual,target){return `<div class="achievement-cell">${coloredPercent(metric,value)}<span class="achievement-detail">(${fmt(actual)} / ${fmt(target)})</span></div>`}
-function avgRate(actual,target){return target>0?actual/target:0}
-function parseRows(raw){
-  const rows=Papa.parse(raw,{skipEmptyLines:false}).data;
-  const headerIndex=rows.findIndex(r=>String(r[0]||"").trim()==="SE"&&String(r[3]||"").trim()==="KOTA");
-  if(headerIndex<0)throw new Error("Baris judul kolom AHASS tidak ditemukan di CSV. Periksa struktur tab yang dipublikasikan.");
-  const out=[];
-  for(let i=headerIndex+2;i<rows.length;i++){
-    const r=rows[i]||[];
-    const name=String(r[7]||"").trim(), code=String(r[5]||"").trim(), city=String(r[3]||"").trim();
-    if(!name||!code||!city||name.toLowerCase()==="nan"||name.startsWith("#"))continue;
-    const d={se:String(r[0]||"").trim(),group:String(r[1]||"").trim(),no:String(r[2]||"").trim(),city,status:String(r[4]||"").trim(),code,name,
-      kpbTotal:num(r[9]),kpbBooking:num(r[10]),kpbNonBooking:num(r[11]),kpbDigital:num(r[12]),digitalShare:pct(r[13]),
-      bookingTarget:num(r[14]),bookingActual:num(r[15]),bookingAch:pct(r[16]),payTarget:num(r[17]),payActual:num(r[18]),payAch:pct(r[19])};
-    d.digitalShare=d.kpbTotal>0?d.kpbDigital/d.kpbTotal:d.digitalShare;
-    d.bookingAch=d.bookingTarget>0?d.bookingActual/d.bookingTarget:d.bookingAch;
-    d.payAch=d.payTarget>0?d.payActual/d.payTarget:d.payAch;
-    d.bookingGap=Math.max(0,d.bookingTarget-d.bookingActual);d.payGap=Math.max(0,d.payTarget-d.payActual);
-    d.priority=(d.bookingAch<.25||d.payAch<.25)?"Critical":(d.bookingAch<.5||d.payAch<.5||d.digitalShare<.5)?"High":"Monitor";
-    d.focus=[d.bookingAch<.5?"Tingkatkan konversi booking servis":null,d.payAch<.5?"Tingkatkan penggunaan transaksi AstraPay":null,d.digitalShare<.5?"Tingkatkan penggunaan KPB Digital":null].filter(Boolean).join(" • ")||"Pertahankan kinerja saat ini";
-    out.push(d);
-  }
-  return out;
-}
-async function loadData(){
-  $("refreshBtn").disabled=true;$("refreshBtn").textContent="↻ Loading…";$("errorBanner").classList.add("hidden");
-  try{
-    const response=await fetch(CSV_URL,{cache:"no-store"});
-    if(!response.ok)throw new Error(`Google Sheets mengembalikan HTTP ${response.status}.`);
-    const raw=await response.text();
-    const parsed=parseRows(raw);
-    if(!parsed.length)throw new Error("CSV berhasil dimuat, tetapi tidak ada baris AHASS yang terdeteksi.");
-    allRows=parsed;
-    $("connectionLabel").textContent="Terhubung";
-    $("connectionLabel").style.color="#18865b";
-    const meta=raw.match(/Periode\s*:\s*([^,\r\n]+)/i);$("periodLabel").textContent=meta?meta[1].trim():"Google Sheets · Live CSV";
-    populateFilters();render();
-    $("lastUpdated").textContent=new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"});
-  }catch(e){
-    $("connectionLabel").textContent="Kendala koneksi";$("connectionLabel").style.color="#c33d4b";
-    $("errorBanner").textContent="Data langsung tidak dapat dimuat. "+e.message+" Jika terjadi pembatasan CORS browser, publikasikan tab sebagai CSV dan pastikan URL dapat diakses publik.";
-    $("errorBanner").classList.remove("hidden");
-    if(!allRows.length){$("periodLabel").textContent="Data tidak tersedia";["kpiDigital","kpiBooking","kpiPay","kpiOutlets"].forEach(id=>$(id).textContent="—")}
-  }finally{$("refreshBtn").disabled=false;$("refreshBtn").innerHTML="↻ <span>Refresh data</span>"}
-}
-function populateFilters(resetDependents=false){
-  const filterDefs=[
-    {id:"cityFilter",key:"city",all:"Semua kota",label:d=>d.city},
-    {id:"groupFilter",key:"group",all:"Semua grup",label:d=>d.group},
-    {id:"statusFilter",key:"status",all:"Semua status",label:d=>d.status},
-    {id:"ahassFilter",key:"ahass",all:"Semua AHASS",label:d=>`${String(d.code||"").trim()}||${String(d.name||"").trim()}`}
-  ];
-  const current={};
-  filterDefs.forEach(f=>current[f.key]=$(f.id).value);
-  if(resetDependents){
-    current.group="all";current.status="all";current.ahass="all";
-  }
-
-  // Rebuild each dropdown using all other active filters. This keeps the
-  // available choices mutually consistent instead of merely filtering by city.
-  filterDefs.forEach(f=>{
-    const otherRows=allRows.filter(d=>filterDefs.every(other=>{
-      if(other.key===f.key)return true;
-      const selected=current[other.key];
-      if(!selected||selected==="all")return true;
-      if(other.key==="ahass")return `${String(d.code||"").trim()}||${String(d.name||"").trim()}`===selected;
-      return String(d[other.key]||"").trim()===selected;
-    }));
-    let options;
-    if(f.key==="ahass"){
-      options=[...new Map(otherRows.filter(d=>String(d.name||"").trim()).map(d=>{
-        const code=String(d.code||"").trim(),name=String(d.name||"").trim(),key=`${code}||${name}`;
-        return [key,{value:key,label:code?`${code} - ${name}`:name}];
-      })).values()].sort((a,b)=>a.label.localeCompare(b.label,"id"));
-    } else {
-      options=[...new Set(otherRows.map(d=>String(d[f.key]||"").trim()).filter(Boolean))]
-        .sort((a,b)=>a.localeCompare(b,"id")).map(v=>({value:v,label:v}));
-    }
-    const select=$(f.id),wanted=current[f.key];
-    select.innerHTML=`<option value="all">${f.all}</option>`+options.map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join("");
-    const valid=options.some(o=>o.value===wanted);
-    select.value=valid?wanted:"all";
-    current[f.key]=select.value;
-  });
-}
-function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function filtered(){
-  const city=$("cityFilter").value,group=$("groupFilter").value,status=$("statusFilter").value,ahass=$("ahassFilter").value;
-  return allRows.filter(d=>(city==="all"||String(d.city||"").trim()===city)
-    &&(group==="all"||String(d.group||"").trim()===group)
-    &&(status==="all"||String(d.status||"").trim()===status)
-    &&(ahass==="all"||`${String(d.code||"").trim()}||${String(d.name||"").trim()}`===ahass));
-}
-function aggregate(rows){return rows.reduce((a,d)=>{["kpbTotal","kpbDigital","kpbNonBooking","kpbBooking","bookingTarget","bookingActual","payTarget","payActual"].forEach(k=>a[k]+=d[k]);return a},{kpbTotal:0,kpbDigital:0,kpbNonBooking:0,kpbBooking:0,bookingTarget:0,bookingActual:0,payTarget:0,payActual:0})}
-function chart(id,config){if(charts[id])charts[id].destroy();const el=$(id);if(el)charts[id]=new Chart(el,config)}
-function baseOptions(){return {responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:"#142b49",padding:10,titleFont:{family:"DM Sans"},bodyFont:{family:"DM Sans"}}},scales:{x:{grid:{display:false},ticks:{color:"#8c98aa",font:{family:"DM Sans",size:10}}},y:{grid:{color:"#eef1f6"},ticks:{color:"#8c98aa",font:{family:"DM Sans",size:10}}}}}}
-function render(){
- const rows=filtered(),a=aggregate(rows),digital=a.kpbTotal?a.kpbDigital/a.kpbTotal:0,b=avgRate(a.bookingActual,a.bookingTarget),p=avgRate(a.payActual,a.payTarget);
- $("kpiDigital").innerHTML=coloredPercent("digitalShare",digital);$("digitalCount").textContent=fmt(a.kpbDigital)+" / "+fmt(a.kpbTotal);
- $("kpiBooking").innerHTML=coloredPercent("bookingAch",b);$("bookingCount").textContent=fmt(a.bookingActual)+" / "+fmt(a.bookingTarget);
- $("kpiPay").innerHTML=coloredPercent("payAch",p);$("payCount").textContent=fmt(a.payActual)+" / "+fmt(a.payTarget);$("kpiOutlets").textContent=fmt(rows.length);
- chart("achievementChart",{type:"bar",data:{labels:["KPB Digital","Booking Servis","AstraPay"],datasets:[{data:[digital*100,b*100,p*100],backgroundColor:["#2864dc","#8c6ce5","#2ca878"],borderRadius:6,barThickness:28}]},options:{...baseOptions(),indexAxis:"y",scales:{x:{beginAtZero:true,grid:{color:"#eef1f6"},ticks:{color:"#8c98aa",callback:v=>v+"%"}},y:{grid:{display:false},ticks:{color:"#56657a"}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.toFixed(1)+"%"}}}}});
- chart("mixChart",{type:"doughnut",data:{labels:["Digital KPB","Non-digital KPB"],datasets:[{data:[a.kpbDigital,Math.max(0,a.kpbTotal-a.kpbDigital)],backgroundColor:["#2864dc","#dce3ed"],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:"72%",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+": "+fmt(c.raw)}}}}});
- const top=[...rows].sort((x,y)=>Math.min(x.bookingAch,x.payAch)-Math.min(y.bookingAch,y.payAch)).slice(0,6);
- $("watchlistBody").innerHTML=top.map(d=>`<tr><td>${esc(d.code)} · ${esc(d.name)}</td><td>${esc(d.city)}</td><td>${achievementCell("digitalShare",d.digitalShare,d.kpbDigital,d.kpbTotal)}</td><td>${achievementCell("bookingAch",d.bookingAch,d.bookingActual,d.bookingTarget)}</td><td>${achievementCell("payAch",d.payAch,d.payActual,d.payTarget)}</td><td>${badge(d.priority)}</td></tr>`).join("")||emptyRow(6);
- renderChannels(rows,a);renderRanking(rows);renderActions(rows);
-}
-function badge(p){const label=({"Critical":"Kritis","High":"Tinggi","Monitor":"Pantau"})[p]||p;return `<span class="pill ${p.toLowerCase()}">${label}</span>`}
-function emptyRow(n){return `<tr><td colspan="${n}" class="empty">Tidak ada AHASS yang sesuai dengan filter yang dipilih.</td></tr>`}
-function renderChannels(rows,a){
- const d=a.kpbTotal?a.kpbDigital/a.kpbTotal:0,b=avgRate(a.bookingActual,a.bookingTarget),p=avgRate(a.payActual,a.payTarget);
- chart("channelChart",{type:"bar",data:{labels:["Presentase KPB Digital","Booking Servis","AstraPay"],datasets:[{label:"Achievement",data:[d*100,b*100,p*100],backgroundColor:["#2864dc","#8c6ce5","#2ca878"],borderRadius:6,barThickness:32}]},options:{...baseOptions(),scales:{x:{grid:{display:false},ticks:{color:"#78869a"}},y:{beginAtZero:true,grid:{color:"#eef1f6"},ticks:{color:"#8c98aa",callback:v=>v+"%"}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.toFixed(1)+"%"}}}}});
- const statuses=[...new Set(rows.map(d=>d.status).filter(Boolean))].sort(),values=statuses.map(s=>{const z=aggregate(rows.filter(d=>d.status===s));return z.kpbTotal?z.kpbDigital/z.kpbTotal*100:0});
- chart("statusChart",{type:"bar",data:{labels:statuses,datasets:[{data:values,backgroundColor:"#3975e8",borderRadius:5,barThickness:28}]},options:{...baseOptions(),scales:{x:{grid:{display:false},ticks:{color:"#78869a"}},y:{beginAtZero:true,max:100,grid:{color:"#eef1f6"},ticks:{color:"#8c98aa",callback:v=>v+"%"}}},plugins:{tooltip:{callbacks:{label:c=>c.raw.toFixed(1)+"%"}}}}});
- $("channelSummary").innerHTML=[["KPB Digital",coloredPercent("digitalShare",d),`${fmt(a.kpbDigital)} KPB digital dari ${fmt(a.kpbTotal)} total KPB`],["Booking Servis",coloredPercent("bookingAch",b),`${fmt(a.bookingActual)} aktual dari target ${fmt(a.bookingTarget)}`],["AstraPay",coloredPercent("payAch",p),`${fmt(a.payActual)} aktual dari target ${fmt(a.payTarget)}`]].map(x=>`<div class="channel-card"><h3>${x[0]}</h3><strong>${x[1]}</strong><p>${x[2]}</p></div>`).join("");
-}
-function renderRanking(rows){
- const metric=$("rankMetric").value,limit=Number($("rankLimit").value);
- const sorted=[...rows].sort((a,b)=>b[metric]-a[metric]).slice(0,limit);
- $("rankingBody").innerHTML=sorted.map((d,i)=>`<tr><td>${i+1}</td><td>${esc(d.code)} · ${esc(d.name)}</td><td>${esc(d.city)}</td><td>${esc(d.group)}</td><td>${achievementCell("digitalShare",d.digitalShare,d.kpbDigital,d.kpbTotal)}</td><td>${achievementCell("bookingAch",d.bookingAch,d.bookingActual,d.bookingTarget)}</td><td>${achievementCell("payAch",d.payAch,d.payActual,d.payTarget)}</td></tr>`).join("")||emptyRow(7);
-}
-function renderActions(rows){
- const counts={Critical:0,High:0,Monitor:0};rows.forEach(d=>counts[d.priority]++);
- $("actionKpis").innerHTML=[["Critical",counts.Critical],["High",counts.High],["Monitor",counts.Monitor]].map(([k,v])=>`<div class="action-kpi"><span>${({"Critical":"AHASS prioritas kritis","High":"AHASS prioritas tinggi","Monitor":"AHASS untuk dipantau"})[k]}</span><strong>${v}</strong></div>`).join("");
- const filter=$("priorityFilter").value;
- const sorted=rows.filter(d=>filter==="all"||d.priority===filter).sort((a,b)=>({Critical:0,High:1,Monitor:2}[a.priority]-({Critical:0,High:1,Monitor:2}[b.priority]))||Math.min(a.bookingAch,a.payAch)-Math.min(b.bookingAch,b.payAch));
- $("actionsBody").innerHTML=sorted.map(d=>`<tr><td>${badge(d.priority)}</td><td>${esc(d.code)} · ${esc(d.name)}</td><td>${esc(d.city)}</td><td>${fmt(d.bookingGap)}</td><td>${fmt(d.payGap)}</td><td>${esc(d.focus)}</td></tr>`).join("")||emptyRow(6);
-}
-document.querySelectorAll(".nav-item").forEach(btn=>btn.addEventListener("click",()=>showPage(btn.dataset.page)));
-document.querySelectorAll("[data-goto]").forEach(btn=>btn.addEventListener("click",()=>showPage(btn.dataset.goto)));
-function showPage(page){document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id==="page-"+page));$("pageTitle").textContent=titles[page][0];$("pageSubtitle").textContent=titles[page][1];if(charts.achievementChart||charts.channelChart)Object.values(charts).forEach(c=>c.resize())}
-["cityFilter","groupFilter","statusFilter","ahassFilter"].forEach(id=>$(id).addEventListener("change",()=>{populateFilters(false);render()}));
-["rankMetric","rankLimit","priorityFilter"].forEach(id=>$(id).addEventListener("change",render));
-$("refreshBtn").addEventListener("click",loadData);
-$("exportJpegBtn").addEventListener("click",exportDashboardJpeg);
-
-async function exportDashboardJpeg(){
-  const btn=$("exportJpegBtn");
-  if(!window.html2canvas){
-    alert("Fitur ekspor belum termuat. Periksa koneksi internet lalu coba lagi.");
-    return;
-  }
-  const original=btn.innerHTML;
-  btn.disabled=true;
-  btn.innerHTML="Menyiapkan JPEG…";
-  document.body.classList.add("exporting");
-  try{
-    // Give Chart.js and the browser a moment to finish drawing before capture.
-    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    const target=$("page-overview");
-    const canvas=await html2canvas(document.querySelector(".main"),{
-      backgroundColor:"#f4f7fc",
-      scale:1.5,
-      useCORS:true,
-      logging:false,
-      windowWidth:2200,
-      width:2200,
-      onclone:(doc)=>{
-        doc.body.classList.add("exporting");
-        const clonedMain=doc.querySelector(".main");
-        if(clonedMain){clonedMain.style.width="2200px";clonedMain.style.maxWidth="none";clonedMain.style.marginLeft="0";clonedMain.style.padding="38px 48px";clonedMain.style.boxSizing="border-box";}
-        const actions=doc.querySelector(".top-actions");
-        if(actions)actions.style.visibility="hidden";
-        // Export the current page; omit both charts for a compact dealer report.
-        doc.querySelectorAll(".page:not(.active)").forEach(el=>el.style.display="none");
-        // Hide the entire chart row in the cloned document. Targeting the
-        // container is more reliable than matching translated chart headings.
-        const chartRow=doc.querySelector("#page-overview .grid-two");
-        if(chartRow){
-          chartRow.style.setProperty("display","none","important");
-          chartRow.style.setProperty("height","0","important");
-          chartRow.style.setProperty("margin","0","important");
-          chartRow.style.setProperty("padding","0","important");
-        }
-        // Fallback: hide any chart panels still present in the export clone.
-        doc.querySelectorAll("#page-overview canvas").forEach(canvas=>{
-          const panel=canvas.closest(".panel");
-          if(panel)panel.style.setProperty("display","none","important");
-        });
-        // Render every AHASS matching the active filters in the JPEG, rather than
-        // the compact six-row watchlist used in the live dashboard.
-        const body=doc.querySelector("#watchlistBody");
-        if(body){
-          const reportRows=filtered().sort((a,b)=>String(a.city).localeCompare(String(b.city))||String(a.code).localeCompare(String(b.code)));
-          body.innerHTML=reportRows.map(d=>`<tr><td>${esc(d.code)} · ${esc(d.name)}</td><td>${esc(d.city)}</td><td>${achievementCell("digitalShare",d.digitalShare,d.kpbDigital,d.kpbTotal)}</td><td>${achievementCell("bookingAch",d.bookingAch,d.bookingActual,d.bookingTarget)}</td><td>${achievementCell("payAch",d.payAch,d.payActual,d.payTarget)}</td><td>${badge(d.priority)}</td></tr>`).join("")||emptyRow(6);
-          const reportTable=body.closest("table");
-          if(reportTable){reportTable.style.width="100%";reportTable.style.fontSize="16px";reportTable.querySelectorAll("th,td").forEach(cell=>{cell.style.padding="15px 18px";cell.style.whiteSpace="nowrap";});}
-          const watchlist=body.closest(".panel");
-          if(watchlist){watchlist.style.marginTop="24px";watchlist.style.padding="28px 32px";}
-        }
-        // Larger typography and spacing for high-resolution landscape reports.
-        const exportStyle=doc.createElement("style");
-        exportStyle.textContent=`#page-overview .kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:18px!important}#page-overview .kpi{min-height:150px!important;padding:24px!important}#page-overview .kpi-value{font-size:38px!important}#page-overview .filterbar{padding:20px 24px!important;margin-bottom:26px!important}#page-overview .page-header h1{font-size:38px!important}#page-overview .eyebrow{font-size:14px!important}#page-overview .panel h2{font-size:24px!important}#page-overview .panel p{font-size:15px!important}#page-overview .achievement-detail{font-size:14px!important}#page-overview .metric-status{font-size:16px!important}#page-overview .pill{font-size:13px!important;padding:6px 10px!important}#page-overview footer{font-size:13px!important}`;
-        doc.head.appendChild(exportStyle);
-      }
-    });
-    const link=document.createElement("a");
-    const city=$("cityFilter").value==="all"?"Semua-Kota":$("cityFilter").value;
-    const group=$("groupFilter").value==="all"?"Semua-Grup":$("groupFilter").value;
-    const ahass=$("ahassFilter").value==="all"?"Semua-AHASS":$("ahassFilter").selectedOptions[0].textContent.split(" - ")[0];
-    const safe=s=>String(s).normalize("NFKD").replace(/[^a-zA-Z0-9_-]+/g,"-").replace(/^-|-$/g,"").slice(0,45);
-    link.download=`Laporan-Digital-AHASS-${safe(city)}-${safe(group)}-${safe(ahass)}.jpg`;
-    link.href=canvas.toDataURL("image/jpeg",0.94);
-    link.click();
-  }catch(err){
-    console.error("JPEG export failed:",err);
-    alert("Gagal mengekspor JPEG. Coba lagi setelah dashboard selesai dimuat.");
-  }finally{
-    document.body.classList.remove("exporting");
-    btn.disabled=false;
-    btn.innerHTML=original;
-  }
-}
-
-loadData();
-setInterval(loadData,5*60*1000);
+function toast(s){$('toast').textContent=s;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),3000)}
+async function refresh(){try{$('dataState').textContent='Memperbarui data...';await loadPeriod(currentPeriod);refreshFilters();draw();$('updatedAt').textContent=new Date().toLocaleString('id-ID');$('dataState').textContent=`Live • ${currentRows().length} AHASS`; }catch(e){$('dataState').textContent='Gagal memuat data';toast('Gagal memuat data: '+e.message);console.error(e)}}
+function setPage(page){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id==='page-'+page));document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x.dataset.page===page));$('crumb').textContent=({overview:'Ringkasan',channel:'Analisis Channel',ranking:'Peringkat AHASS',actions:'Prioritas Tindak Lanjut'})[page]}
+document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.page)));document.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.goto)));
+['cityFilter','groupFilter','statusFilter','ahassFilter'].forEach(id=>$(id).addEventListener('change',()=>{refreshFilters(id.replace('Filter',''));draw()}));$('resetFilters').addEventListener('click',()=>{['cityFilter','groupFilter','statusFilter','ahassFilter'].forEach(id=>$(id).value='all');refreshFilters();draw()});$('periodSelect').addEventListener('change',async e=>{currentPeriod=e.target.value;await refresh()});$('refreshBtn').addEventListener('click',refresh);['searchAhass','rankingMetric','priorityFilter'].forEach(id=>$(id).addEventListener('input',draw));$('exportJpeg').addEventListener('click',async()=>{try{const rows=selectedRows();if(!rows.length)throw Error('Tidak ada AHASS untuk diekspor.');const wrap=document.createElement('div');wrap.style.cssText='position:fixed;left:-10000px;top:0;width:2200px;background:#fff;padding:38px;font-family:Arial;color:#1b2a3d';const t=aggregate(rows);wrap.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:end;margin-bottom:22px"><div><div style="font-size:15px;color:#d9273e;font-weight:bold;letter-spacing:2px">ASTRA MOTOR SUMATERA SELATAN</div><h1 style="font-size:32px;margin:10px 0">RESUME PERFORMANCE DIGITAL AHASS</h1><div style="font-size:16px;color:#64758b">${currentPeriod==='oct'?'Oktober':'November'} 2026 • ${rows.length} AHASS</div></div><div style="font-size:13px;color:#64758b">Export: ${new Date().toLocaleString('id-ID')}</div></div><div style="display:flex;gap:18px;margin-bottom:25px">${[['KPB DIGITAL',pct(t.kpbDigital,t.kpbTarget),t.kpbDigital,t.kpbTarget],['BOOKING SERVICE',pct(t.bookingActual,t.bookingTarget),t.bookingActual,t.bookingTarget],['ASTRAPAY',pct(t.astraActual,t.astraTarget),t.astraActual,t.astraTarget]].map(x=>`<div style="flex:1;border:1px solid #e3e8ee;border-radius:10px;padding:18px"><div style="font-size:13px;color:#718096;font-weight:bold">${x[0]}</div><b style="display:block;font-size:30px;margin:8px 0">${pctText(x[1])}</b><span style="font-size:13px;color:#718096">${fmt(x[2])} / ${fmt(x[3])}</span></div>`).join('')}</div><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#102b4e;color:white">${['NO','KOTA','GRUP','STATUS','NO. AHASS','NAMA AHASS','KPB DIGITAL','BOOKING','ASTRAPAY','PRIORITAS'].map(x=>`<th style="padding:12px;text-align:left">${x}</th>`).join('')}</tr></thead><tbody>${rows.slice().sort((x,y)=>x.name.localeCompare(y.name)).map((r,i)=>{const p=priority(r);return `<tr>${[i+1,r.city,r.group,r.status,r.code,r.name,`${pctText(pct(r.kpbDigital,r.kpbTarget))} (${fmt(r.kpbDigital)}/${fmt(r.kpbTarget)})`,`${pctText(pct(r.bookingActual,r.bookingTarget))} (${fmt(r.bookingActual)}/${fmt(r.bookingTarget)})`,`${pctText(pct(r.astraActual,r.astraTarget))} (${fmt(r.astraActual)}/${fmt(r.astraTarget)})`,p.level.toUpperCase()].map(v=>`<td style="padding:11px;border-bottom:1px solid #e8edf2">${esc(v)}</td>`).join('')}</tr>`}).join('')}</tbody></table>`;document.body.appendChild(wrap);const canvas=await html2canvas(wrap,{scale:2,backgroundColor:'#fff',useCORS:true});const a=document.createElement('a');a.download=`Resume-Performance-Digital-AHASS-${currentPeriod==='oct'?'Oktober':'November'}-2026.jpg`;a.href=canvas.toDataURL('image/jpeg',.95);a.click();wrap.remove();toast('JPEG berhasil dibuat.');}catch(e){toast('Ekspor gagal: '+e.message)}});
+refresh();setInterval(refresh,REFRESH_MS);
